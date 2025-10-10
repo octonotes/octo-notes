@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OctoNotes+ v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Roboto&family=Montserrat&family=Lato&family=Open+Sans&family=Oswald&family=PT+Sans&family=Raleway&family=Source+Sans+Pro&family=Ubuntu&family=Playfair+Display&family=Merriweather&family=Inconsolata&family=Pacifico&family=Fira+Sans&family=Roboto+Slab&display=swap" rel="stylesheet">
+
 <style>
 body { margin:0; font-family:'Segoe UI',sans-serif; background:#f5f7fb; color:#222; display:flex; flex-direction:column; height:100vh;}
 button, select, input, textarea { font-family: inherit; cursor:pointer; }
@@ -12,9 +17,10 @@ button, select, input, textarea { font-family: inherit; cursor:pointer; }
 #ribbon-tabs .tab { background:none; border:none; padding:6px 12px; border-radius:6px 6px 0 0; transition:all 0.15s ease; font-weight:500; }
 #ribbon-tabs .tab:hover { background:#e9edf6; }
 #ribbon-tabs .tab.active { background:#fff; border:1px solid #d5d9e3; border-bottom:none; color:#222; font-weight:600; }
-#ribbon-groups { display:flex; gap:10px; padding:8px 12px; background:#fff; border-top:1px solid #e3e7ef; }
+#ribbon-groups { display:flex; gap:10px; padding:8px 12px; background:#fff; border-top:1px solid #e3e7ef; flex-wrap:wrap; }
 .ribbon-group { display:flex; align-items:center; gap:8px; }
 .hidden { display:none; }
+
 #notebook { flex:1; overflow:auto; padding:20px; display:flex; flex-direction:column; align-items:center; }
 .page { position:relative; background:#fff; box-shadow:0 0 6px rgba(0,0,0,0.1); width:800px; height:1100px; margin:20px auto; border-radius:6px; overflow:hidden; }
 canvas.drawing { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
@@ -23,6 +29,7 @@ canvas.drawing { position:absolute; top:0; left:0; width:100%; height:100%; touc
 .page.bg-grid::before { background-image:linear-gradient(#9bc4f5 1px, transparent 1px), linear-gradient(90deg, #9bc4f5 1px, transparent 1px); }
 .page.bg-dots::before { background-image:radial-gradient(#9bc4f5 1px, transparent 1px); }
 .page.bg-music::before { background-image:repeating-linear-gradient(#000 0, #000 1px, transparent 1px, transparent 20px); }
+
 .note-text { position:absolute; background:transparent; border:none; resize:none; font-size:16px; outline:none; width:300px; height:100px; }
 img.draggable { position:absolute; max-width:300px; cursor:move; transform-origin:center center; transition:transform 0.1s ease; }
 </style>
@@ -37,6 +44,7 @@ img.draggable { position:absolute; max-width:300px; cursor:move; transform-origi
     <button class="tab" data-tab="draw">🖊️ Zeichnen</button>
     <button class="tab" data-tab="view">👁️ Ansicht</button>
   </div>
+
   <div id="ribbon-groups">
     <div class="ribbon-group" id="tab-file">
       <button onclick="saveONNB()">💾 Speichern</button>
@@ -44,15 +52,48 @@ img.draggable { position:absolute; max-width:300px; cursor:move; transform-origi
       <button onclick="openONNB()">📂 Öffnen</button>
       <button onclick="printNote()">🖨️ Drucken</button>
     </div>
+
     <div class="ribbon-group hidden" id="tab-home">
       <button onclick="addPage()">📄 Neue Seite</button>
       <button onclick="addText()">📝 Textfeld</button>
       <button onclick="deletePage()">🗑️ Seite löschen</button>
+      <select id="fontFamily" onchange="setFont(this.value)">
+        <option value="sans-serif">System</option>
+        <option value="Roboto">Roboto</option>
+        <option value="Montserrat">Montserrat</option>
+        <option value="Lato">Lato</option>
+        <option value="Open Sans">Open Sans</option>
+        <option value="Oswald">Oswald</option>
+        <option value="PT Sans">PT Sans</option>
+        <option value="Raleway">Raleway</option>
+        <option value="Source Sans Pro">Source Sans Pro</option>
+        <option value="Ubuntu">Ubuntu</option>
+        <option value="Playfair Display">Playfair Display</option>
+        <option value="Merriweather">Merriweather</option>
+        <option value="Inconsolata">Inconsolata</option>
+        <option value="Pacifico">Pacifico</option>
+        <option value="Fira Sans">Fira Sans</option>
+        <option value="Roboto Slab">Roboto Slab</option>
+      </select>
+      <select id="fontSize" onchange="setFontSize(this.value)">
+        <option value="12">12px</option>
+        <option value="14" selected>14px</option>
+        <option value="16">16px</option>
+        <option value="18">18px</option>
+        <option value="20">20px</option>
+        <option value="24">24px</option>
+        <option value="28">28px</option>
+      </select>
+      <button onclick="toggleStyle('bold')">B</button>
+      <button onclick="toggleStyle('italic')">I</button>
+      <button onclick="toggleStyle('underline')">U</button>
     </div>
+
     <div class="ribbon-group hidden" id="tab-insert">
       <button onclick="triggerFile()">🖼️ Bild einfügen</button>
       <input type="file" id="imgInput" accept="image/*" hidden>
     </div>
+
     <div class="ribbon-group hidden" id="tab-draw">
       <label>Farbe <input type="color" id="color" value="#000000"></label>
       <label>Stärke <input type="range" id="size" min="1" max="15" value="3"></label>
@@ -60,6 +101,7 @@ img.draggable { position:absolute; max-width:300px; cursor:move; transform-origi
       <button onclick="setTool('marker')">🖍️ Marker</button>
       <button onclick="setTool('eraser')">🩹 Radierer</button>
     </div>
+
     <div class="ribbon-group hidden" id="tab-view">
       <select id="bgSelect" onchange="changeBG(this.value)">
         <option value="blank">Leer</option>
@@ -84,6 +126,7 @@ let tool = "pen";
 let colorPicker = document.getElementById("color");
 let sizePicker = document.getElementById("size");
 let zoomLevel = 1;
+let activeText = null;
 
 // --- Init ---
 function init() {
@@ -109,14 +152,14 @@ function setupRibbonTabs() {
     });
   });
 
-  // Setze ersten Tab aktiv
+  // Ersten Tab aktivieren
   tabs[0].classList.add("active");
   groups.forEach(g => g.classList.add("hidden"));
   const firstGroup = document.getElementById("tab-" + tabs[0].dataset.tab);
   if (firstGroup) firstGroup.classList.remove("hidden");
 }
 
-// --- Pages ---
+// --- Seiten ---
 function addPage() {
   const page = document.createElement("div");
   page.className = "page bg-lined";
@@ -136,7 +179,6 @@ function deletePage() {
   const idx = parseInt(activePage.dataset.index);
   activePage.remove();
 
-  // Update indices
   [...notebook.children].forEach((p, i) => p.dataset.index = i);
   if (notebook.children[idx]) setActivePage(notebook.children[idx]);
   else if (notebook.children[idx - 1]) setActivePage(notebook.children[idx - 1]);
@@ -149,11 +191,7 @@ function setActivePage(page) {
   activePage.style.border = "2px solid #0078D7";
 }
 
-// Seitenwechsel
-function nextPage() { if (activePage.dataset.index < notebook.children.length - 1) setActivePage(notebook.children[parseInt(activePage.dataset.index)+1]); }
-function prevPage() { if (activePage.dataset.index > 0) setActivePage(notebook.children[parseInt(activePage.dataset.index)-1]); }
-
-// --- Drawing ---
+// --- Zeichnen ---
 function setupDrawing(canvas) {
   const ctx = canvas.getContext("2d");
   let drawing = false;
@@ -161,22 +199,17 @@ function setupDrawing(canvas) {
 
   function getCursorPos(e) {
     const rect = canvas.getBoundingClientRect();
-    // Berechnung unter Berücksichtigung von CSS-Scale (zoomLevel)
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY
-    };
+    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
   }
 
   function startDraw(e) {
     drawing = true;
     const pos = getCursorPos(e);
-    lastX = pos.x;
-    lastY = pos.y;
+    lastX = pos.x; lastY = pos.y;
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
   }
@@ -202,8 +235,7 @@ function setupDrawing(canvas) {
 
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
-    lastX = pos.x;
-    lastY = pos.y;
+    lastX = pos.x; lastY = pos.y;
   }
 
   function stopDraw() {
@@ -220,7 +252,8 @@ function setupDrawing(canvas) {
   canvas.addEventListener("touchstart", startDraw);
   canvas.addEventListener("touchmove", draw);
   canvas.addEventListener("touchend", stopDraw);
-  }
+}
+
 // --- Tools ---
 function setTool(t) { tool = t; }
 
@@ -230,8 +263,24 @@ function addText() {
   const t = document.createElement("textarea");
   t.className = "note-text";
   t.style.left = "100px"; t.style.top = "100px";
+  t.style.fontFamily = document.getElementById("fontFamily").value;
+  t.style.fontSize = document.getElementById("fontSize").value + "px";
   activePage.appendChild(t);
   t.focus();
+  activeText = t;
+
+  t.addEventListener("focus", ()=>activeText=t);
+  t.addEventListener("blur", ()=>activeText=null);
+}
+
+// --- Textformatierung ---
+function setFont(font) { if(activeText) activeText.style.fontFamily=font; }
+function setFontSize(size) { if(activeText) activeText.style.fontSize=size+"px"; }
+function toggleStyle(style) {
+  if(!activeText) return;
+  if(style==="bold") activeText.style.fontWeight = activeText.style.fontWeight==="bold"?"normal":"bold";
+  if(style==="italic") activeText.style.fontStyle = activeText.style.fontStyle==="italic"?"normal":"italic";
+  if(style==="underline") activeText.style.textDecoration = activeText.style.textDecoration==="underline"?"none":"underline";
 }
 
 // --- Bilder ---
@@ -247,15 +296,15 @@ document.getElementById("imgInput").onchange = e => {
 };
 
 function makeDraggable(el) {
-  let pos = {x:0,y:0,startX:0,startY:0};
-  function startDrag(e) {
+  let pos={x:0,y:0,startX:0,startY:0};
+  function startDrag(e){
     e.preventDefault();
     const evt = e.touches ? e.touches[0] : e;
     pos.startX = evt.clientX; pos.startY = evt.clientY;
-    document.addEventListener(e.touches ? "touchmove" : "mousemove", drag);
-    document.addEventListener(e.touches ? "touchend" : "mouseup", stopDrag);
+    document.addEventListener(e.touches?"touchmove":"mousemove", drag);
+    document.addEventListener(e.touches?"touchend":"mouseup", stopDrag);
   }
-  function drag(e) {
+  function drag(e){
     e.preventDefault();
     const evt = e.touches ? e.touches[0] : e;
     const dx = evt.clientX - pos.startX;
@@ -264,7 +313,7 @@ function makeDraggable(el) {
     el.style.top = (el.offsetTop + dy) + "px";
     el.style.left = (el.offsetLeft + dx) + "px";
   }
-  function stopDrag() {
+  function stopDrag(){
     document.removeEventListener("mousemove", drag);
     document.removeEventListener("mouseup", stopDrag);
     document.removeEventListener("touchmove", drag);
@@ -283,9 +332,8 @@ function changeBG(type) {
   else if(type==="dots") activePage.classList.add("bg-dots");
   else if(type==="music") activePage.classList.add("bg-music");
 }
-function changePatternSize(v) { if(activePage) activePage.style.setProperty("--pattern-size", v+"px"); }
-
-// --- ONNB Save & Load ---
+function changePatternSize(v) { if(activePage) activePage.style.setProperty("--pattern-size",v+"px"); }
+  // --- ONNB Save & Load ---
 function saveONNB() {
   const data = { pages: [] };
   document.querySelectorAll(".page").forEach(page => {
@@ -294,77 +342,132 @@ function saveONNB() {
     const texts = [];
     page.querySelectorAll("textarea.note-text").forEach(t => {
       texts.push({
-        value: t.value, left: t.style.left, top: t.style.top,
-        width: t.style.width, height: t.style.height, fontSize: t.style.fontSize
+        value: t.value,
+        left: t.style.left,
+        top: t.style.top,
+        width: t.style.width,
+        height: t.style.height,
+        fontSize: t.style.fontSize,
+        fontFamily: t.style.fontFamily,
+        fontWeight: t.style.fontWeight,
+        fontStyle: t.style.fontStyle,
+        textDecoration: t.style.textDecoration
       });
     });
     const images = [];
     page.querySelectorAll("img.draggable").forEach(im => {
-      images.push({src:im.src,left:im.style.left,top:im.style.top,width:im.width,height:im.height});
+      images.push({
+        src: im.src,
+        left: im.style.left,
+        top: im.style.top,
+        width: im.width,
+        height: im.height
+      });
     });
-    data.pages.push({imgData,texts,images,bg:page.className});
+    data.pages.push({ imgData, texts, images, bg: page.className });
   });
-  const blob = new Blob([JSON.stringify(data)],{type:"application/json"});
-  const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="OctoNote.onnb"; a.click();
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "OctoNote.onnb";
+  a.click();
 }
 
 function openONNB() {
-  const input = document.createElement("input"); input.type="file"; input.accept=".onnb";
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".onnb";
   input.onchange = e => {
-    const file = e.target.files[0]; if(!file) return;
+    const file = e.target.files[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
       const data = JSON.parse(ev.target.result);
       notebook.innerHTML = "";
       data.pages.forEach(p => {
-        const page = document.createElement("div"); page.className = p.bg;
-        const canvas = document.createElement("canvas"); canvas.className = "drawing"; canvas.width=800; canvas.height=1100;
+        const page = document.createElement("div");
+        page.className = p.bg;
+        const canvas = document.createElement("canvas");
+        canvas.className = "drawing";
+        canvas.width = 800;
+        canvas.height = 1100;
         page.appendChild(canvas);
         const ctx = canvas.getContext("2d");
-        const img = new Image(); img.src=p.imgData; img.onload = ()=>ctx.drawImage(img,0,0);
-        p.texts.forEach(t=>{
-          const ta=document.createElement("textarea"); ta.className="note-text";
-          ta.value=t.value; ta.style.left=t.left; ta.style.top=t.top;
-          ta.style.width=t.width; ta.style.height=t.height; ta.style.fontSize=t.fontSize;
+        const img = new Image();
+        img.src = p.imgData;
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        p.texts.forEach(t => {
+          const ta = document.createElement("textarea");
+          ta.className = "note-text";
+          ta.value = t.value;
+          ta.style.left = t.left;
+          ta.style.top = t.top;
+          ta.style.width = t.width;
+          ta.style.height = t.height;
+          ta.style.fontSize = t.fontSize;
+          ta.style.fontFamily = t.fontFamily;
+          ta.style.fontWeight = t.fontWeight;
+          ta.style.fontStyle = t.fontStyle;
+          ta.style.textDecoration = t.textDecoration;
           page.appendChild(ta);
         });
-        p.images.forEach(im=>{
-          const image = new Image(); image.src=im.src; image.className="draggable"; image.style.left=im.left; image.style.top=im.top;
-          page.appendChild(image); makeDraggable(image);
+        p.images.forEach(im => {
+          const image = new Image();
+          image.src = im.src;
+          image.className = "draggable";
+          image.style.left = im.left;
+          image.style.top = im.top;
+          page.appendChild(image);
+          makeDraggable(image);
         });
-        notebook.appendChild(page); setupDrawing(canvas);
+        notebook.appendChild(page);
+        setupDrawing(canvas);
       });
-      if(notebook.children[0]) setActivePage(notebook.children[0]);
+      if (notebook.children[0]) setActivePage(notebook.children[0]);
     };
     reader.readAsText(file);
   };
   input.click();
 }
 
-// --- PDF Export & Drucken ---
+// --- PDF Export ---
 async function exportPDF() {
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({unit:"px", format:[800,1100]});
+  const pdf = new jsPDF({ unit: "px", format: [800, 1100] });
   const pages = document.querySelectorAll(".page");
-  for(let i=0;i<pages.length;i++){
-    const canvasEl = document.createElement("canvas"); canvasEl.width=800; canvasEl.height=1100;
+
+  for (let i = 0; i < pages.length; i++) {
+    const canvasEl = document.createElement("canvas");
+    canvasEl.width = 800;
+    canvasEl.height = 1100;
     const tctx = canvasEl.getContext("2d");
     const page = pages[i];
     const canvas = page.querySelector("canvas.drawing");
-    tctx.drawImage(canvas,0,0);
-    page.querySelectorAll("textarea.note-text").forEach(t=>{
-      tctx.font = `${parseInt(t.style.fontSize||16)}px sans-serif`;
+    tctx.drawImage(canvas, 0, 0);
+
+    page.querySelectorAll("textarea.note-text").forEach(t => {
+      tctx.font = `${parseInt(t.style.fontSize || 16)}px ${t.style.fontFamily || "sans-serif"}`;
       tctx.fillStyle = "#000";
-      t.value.split("\n").forEach((line,j)=>tctx.fillText(line,parseInt(t.style.left),parseInt(t.style.top)+16*(j+1)));
+      if (t.style.fontWeight === "bold") tctx.font = "bold " + tctx.font;
+      if (t.style.fontStyle === "italic") tctx.font = "italic " + tctx.font;
+      t.value.split("\n").forEach((line, j) =>
+        tctx.fillText(line, parseInt(t.style.left), parseInt(t.style.top) + 16 * (j + 1))
+      );
     });
-    page.querySelectorAll("img.draggable").forEach(im=>tctx.drawImage(im,parseInt(im.style.left),parseInt(im.style.top),im.width,im.height));
+
+    page.querySelectorAll("img.draggable").forEach(im =>
+      tctx.drawImage(im, parseInt(im.style.left), parseInt(im.style.top), im.width, im.height)
+    );
+
     const imgData = canvasEl.toDataURL("image/png");
-    if(i>0) pdf.addPage();
-    pdf.addImage(imgData,"PNG",0,0,800,1100);
+    if (i > 0) pdf.addPage();
+    pdf.addImage(imgData, "PNG", 0, 0, 800, 1100);
   }
+
   pdf.save("OctoNote.pdf");
 }
 
+// --- Drucken ---
 function printNote() {
   const w = window.open();
   w.document.write(notebook.innerHTML);
@@ -374,53 +477,85 @@ function printNote() {
   w.close();
 }
 
-// --- Auto-Save ---
+// --- AutoSave ---
 function autoSave() {
   const data = { pages: [] };
-  document.querySelectorAll(".page").forEach(page=>{
+  document.querySelectorAll(".page").forEach(page => {
     const canvas = page.querySelector("canvas.drawing");
     const imgData = canvas.toDataURL();
     const texts = [];
-    page.querySelectorAll("textarea.note-text").forEach(t=>{
-      texts.push({ value:t.value, left:t.style.left, top:t.style.top, width:t.style.width, height:t.style.height, fontSize:t.style.fontSize });
+    page.querySelectorAll("textarea.note-text").forEach(t => {
+      texts.push({
+        value: t.value,
+        left: t.style.left,
+        top: t.style.top,
+        width: t.style.width,
+        height: t.style.height,
+        fontSize: t.style.fontSize,
+        fontFamily: t.style.fontFamily,
+        fontWeight: t.style.fontWeight,
+        fontStyle: t.style.fontStyle,
+        textDecoration: t.style.textDecoration
+      });
     });
     const images = [];
-    page.querySelectorAll("img.draggable").forEach(im=>images.push({src:im.src,left:im.style.left,top:im.style.top,width:im.width,height:im.height}));
-    data.pages.push({imgData,texts,images,bg:page.className});
+    page.querySelectorAll("img.draggable").forEach(im =>
+      images.push({ src: im.src, left: im.style.left, top: im.style.top, width: im.width, height: im.height })
+    );
+    data.pages.push({ imgData, texts, images, bg: page.className });
   });
-  localStorage.setItem(`octonote-${notebook.dataset.id||"default"}`, JSON.stringify(data));
+  localStorage.setItem(`octonote-${notebook.dataset.id || "default"}`, JSON.stringify(data));
 }
-setInterval(autoSave,5000);
+setInterval(autoSave, 5000);
 
 // --- Load from URL ---
 function loadFromURL() {
   const path = window.location.pathname.split("/");
-  const id = path[path.length-1] || "default";
+  const id = path[path.length - 1] || "default";
   notebook.dataset.id = id;
   const saved = localStorage.getItem(`octonote-${id}`);
-  if(saved){
+  if (saved) {
     const data = JSON.parse(saved);
-    notebook.innerHTML="";
-    data.pages.forEach(p=>{
-      const page = document.createElement("div"); page.className=p.bg;
-      const canvas = document.createElement("canvas"); canvas.className="drawing"; canvas.width=800; canvas.height=1100;
+    notebook.innerHTML = "";
+    data.pages.forEach(p => {
+      const page = document.createElement("div");
+      page.className = p.bg;
+      const canvas = document.createElement("canvas");
+      canvas.className = "drawing";
+      canvas.width = 800;
+      canvas.height = 1100;
       page.appendChild(canvas);
       const ctx = canvas.getContext("2d");
-      const img = new Image(); img.src=p.imgData; img.onload=()=>ctx.drawImage(img,0,0);
-      p.texts.forEach(t=>{
-        const ta=document.createElement("textarea"); ta.className="note-text";
-        ta.value=t.value; ta.style.left=t.left; ta.style.top=t.top; ta.style.width=t.width; ta.style.height=t.height; ta.style.fontSize=t.fontSize;
+      const img = new Image();
+      img.src = p.imgData;
+      img.onload = () => ctx.drawImage(img, 0, 0);
+      p.texts.forEach(t => {
+        const ta = document.createElement("textarea");
+        ta.className = "note-text";
+        ta.value = t.value;
+        ta.style.left = t.left;
+        ta.style.top = t.top;
+        ta.style.width = t.width;
+        ta.style.height = t.height;
+        ta.style.fontSize = t.fontSize;
+        ta.style.fontFamily = t.fontFamily;
+        ta.style.fontWeight = t.fontWeight;
+        ta.style.fontStyle = t.fontStyle;
+        ta.style.textDecoration = t.textDecoration;
         page.appendChild(ta);
       });
-      p.images.forEach(im=>{
-        const image=new Image(); image.src=im.src; image.className="draggable";
-        image.style.left=im.left; image.style.top=im.top; page.appendChild(image); makeDraggable(image);
+      p.images.forEach(im => {
+        const image = new Image();
+        image.src = im.src;
+        image.className = "draggable";
+        image.style.left = im.left;
+        image.style.top = im.top;
+        page.appendChild(image);
+        makeDraggable(image);
       });
-      notebook.appendChild(page); setupDrawing(canvas);
+      notebook.appendChild(page);
+      setupDrawing(canvas);
     });
-    if(notebook.children[0]) setActivePage(notebook.children[0]);
+    if (notebook.children[0]) setActivePage(notebook.children[0]);
   }
   }
-</script>
-</body>
-    </html>
