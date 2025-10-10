@@ -43,24 +43,50 @@ img.draggable { position:absolute; max-width:300px; cursor:move; transform-origi
       <button onclick="exportPDF()">📤 PDF</button>
       <button onclick="openONNB()">📂 Öffnen</button>
       <button onclick="printNote()">🖨️ Drucken</button>
+        <select id="fontFamily">
+        <option value="Arial">Arial</option>
+        <option value="Verdana">Verdana</option>
+        <option value="Tahoma">Tahoma</option>
+        <option value="Times New Roman">Times New Roman</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier New</option>
+        <option value="Trebuchet MS">Trebuchet MS</option>
+        <option value="Impact">Impact</option>
+        <option value="Comic Sans MS">Comic Sans MS</option>
+        <option value="Lucida Console">Lucida Console</option>
+        <option value="Palatino Linotype">Palatino Linotype</option>
+        <option value="Garamond">Garamond</option>
+        <option value="Bookman">Bookman</option>
+        <option value="Candara">Candara</option>
+        <option value="Consolas">Consolas</option>
+        </select>
     </div>
     <div class="ribbon-group hidden" id="tab-home">
       <button onclick="addPage()">📄 Neue Seite</button>
       <button onclick="addText()">📝 Textfeld</button>
       <button onclick="deletePage()">🗑️ Seite löschen</button>
-      <label>Schriftart: 
-  <select id="fontSelect" onchange="setFont(this.value)">
-    <option value="Arial">Arial</option>
-    <option value="Verdana">Verdana</option>
-    <option value="Tahoma">Tahoma</option>
-    <option value="Segoe UI">Segoe UI</option>
-    <option value="Times New Roman">Times New Roman</option>
-    <option value="Courier New">Courier New</option>
-    <option value="Georgia">Georgia</option>
-    <option value="Impact">Impact</option>
-    <option value="Comic Sans MS">Comic Sans MS</option>
-  </select>
-      input type="range" min="10" max="50" value="30" id="bgSize" onchange="changePatternSize(this.value)">
+      
+    </div>
+    <div class="ribbon-group hidden" id="tab-insert">
+      <button onclick="triggerFile()">🖼️ Bild einfügen</button>
+      <input type="file" id="imgInput" accept="image/*" hidden>
+    </div>
+    <div class="ribbon-group hidden" id="tab-draw">
+      <label>Farbe <input type="color" id="color" value="#000000"></label>
+      <label>Stärke <input type="range" id="size" min="1" max="15" value="3"></label>
+      <button onclick="setTool('pen')">🖊️ Stift</button>
+      <button onclick="setTool('marker')">🖍️ Marker</button>
+      <button onclick="setTool('eraser')">🩹 Radierer</button>
+    </div>
+    <div class="ribbon-group hidden" id="tab-view">
+      <select id="bgSelect" onchange="changeBG(this.value)">
+        <option value="blank">Leer</option>
+        <option value="lined">Liniert</option>
+        <option value="grid">Kariert</option>
+        <option value="dots">Punktiert</option>
+        <option value="music">Notenlinien</option>
+      </select>
+      <input type="range" min="10" max="50" value="30" id="bgSize" onchange="changePatternSize(this.value)">
     </div>
   </div>
 </header>
@@ -415,4 +441,4 @@ function loadFromURL() {
   }
 </script>
 </body>
-</html>
+  </html>
