@@ -1,1 +1,276 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OctoNote</title>
 
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Roboto&family=Signika&family=Montserrat&family=Open+Sans&family=Raleway&family=Poppins&family=PT+Serif&family=Playfair+Display&family=Shadows+Into+Light&family=Work+Sans&family=Patrick+Hand&display=swap" rel="stylesheet">
+
+<style>
+/* --- Body & Ribbon --- */
+body { margin:0; font-family: 'Roboto', sans-serif; height:100vh; display:flex; flex-direction:column; background:#f7f9fc;}
+.ribbon { background: linear-gradient(#fdfdfd,#e9edf5); border-bottom:1px solid #c6c9d1; box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+.tabs { display:flex; border-bottom:1px solid #ccc; padding:4px 10px;}
+.tab { padding:6px 14px; cursor:pointer; border-radius:5px 5px 0 0; margin-right:4px; font-weight:600; color:#333;}
+.tab.active { background:#fff; border:1px solid #ccc; border-bottom:none;}
+.tab-content { display:none; background:#fff; padding:10px; border-top:none; min-height:90px;}
+.tab-content.active { display:block; }
+.group { display:inline-block; vertical-align:top; padding:5px 10px; border-right:1px solid #ddd;}
+.group:last-child { border-right:none;}
+button.icon { font-size:20px; background:none; border:none; cursor:pointer; margin:5px; transition:background 0.2s;}
+button.icon:hover { background:#e6eaf2; border-radius:6px;}
+select,input[type="color"],input[type="file"]{ margin:4px; padding:3px; border:1px solid #ccc; border-radius:3px; font-family:inherit; }
+#editor { flex-grow:1; background:white; margin:0; padding:20px; outline:none; font-size:16px; overflow-y:auto; position:relative;}
+canvas.pageCanvas { position:absolute; top:0; left:0; pointer-events:none; }
+.pages-nav { margin:4px; }
+
+/* Tabelle */
+table { border-collapse:collapse; width:100%; }
+td, th { border:1px solid #000; padding:4px; }
+</style>
+</head>
+<body>
+
+<!-- Ribbon -->
+<div class="ribbon">
+  <div class="tabs">
+    <div class="tab active" data-tab="file">Datei</div>
+    <div class="tab" data-tab="home">Start</div>
+    <div class="tab" data-tab="insert">Einfügen</div>
+    <div class="tab" data-tab="draw">Zeichnen</div>
+    <div class="tab" data-tab="view">Ansicht</div>
+  </div>
+
+  <div class="tab-content active" id="file">
+    <div class="group">
+      <button class="icon" onclick="newNotebook()">Neu</button>
+      <button class="icon" onclick="openONNB()">Öffnen</button>
+      <button class="icon" onclick="saveONNB()">Speichern</button>
+      <button class="icon" onclick="exportDocx()">DOCX</button>
+      <button class="icon" onclick="exportPDF()">PDF</button>
+      <input type="file" id="fileInput" accept=".onnb" hidden>
+    </div>
+  </div>
+
+  <div class="tab-content" id="home">
+    <div class="group">
+      <select id="fontSelect"></select>
+      <select id="fontSize"><option>10</option><option>12</option><option>14</option><option>16</option><option>18</option><option>20</option><option>24</option><option>28</option></select>
+      <input type="color" id="colorPicker" title="Schriftfarbe">
+    </div>
+    <div class="group">
+      <button class="icon" onclick="format('bold')">B</button>
+      <button class="icon" onclick="format('italic')">I</button>
+      <button class="icon" onclick="format('underline')">U</button>
+    </div>
+  </div>
+
+  <div class="tab-content" id="insert">
+    <div class="group">
+      <button class="icon" onclick="insertImage()">Bild</button>
+      <button class="icon" onclick="insertTable()">Tabelle</button>
+    </div>
+  </div>
+
+  <div class="tab-content" id="draw">
+    <div class="group">
+      <button class="icon" onclick="startDrawing()">Zeichnen</button>
+      <input type="color" id="drawColor" value="#000000">
+      <select id="drawSize"><option>2</option><option>4</option><option>6</option><option>8</option></select>
+    </div>
+  </div>
+
+  <div class="tab-content" id="view">
+    <div class="group">
+      <button class="icon" onclick="toggleGrid()">Raster/Karo</button>
+      <input type="range" id="gridSize" min="10" max="50" value="20" onchange="updateGrid()">
+    </div>
+  </div>
+</div>
+
+<!-- Editor + Canvas -->
+<div id="editor" contenteditable="true"></div>
+<canvas class="pageCanvas"></canvas>
+<div class="pages-nav"><button onclick="prevPage()">«</button> Seite <span id="currentPage">1</span> von <span id="totalPages">1</span> <button onclick="nextPage()">»</button></div>
+<script>
+// --- Tabs ---
+const tabs = document.querySelectorAll('.tab');
+const contents = document.querySelectorAll('.tab-content');
+tabs.forEach(tab=>tab.addEventListener('click',()=>{
+  tabs.forEach(t=>t.classList.remove('active'));
+  contents.forEach(c=>c.classList.remove('active'));
+  tab.classList.add('active');
+  document.getElementById(tab.dataset.tab).classList.add('active');
+}));
+
+// --- Editor Format ---
+function format(cmd,value=null){document.execCommand(cmd,false,value);}
+document.getElementById('colorPicker').onchange=e=>format('foreColor',e.target.value);
+document.getElementById('fontSize').onchange=e=>format('fontSize',e.target.value);
+
+// Fonts
+const fonts=['Arial','Georgia','Times','Comic Sans MS','Courier New','Verdana','Roboto','Signika','Montserrat','Open Sans','Raleway','Poppins','PT Serif','Playfair Display','Shadows Into Light','Work Sans','Patrick Hand'];
+const fontSelect=document.getElementById('fontSelect');
+fonts.forEach(f=>{let opt=document.createElement('option'); opt.value=f; opt.textContent=f; fontSelect.appendChild(opt);});
+fontSelect.onchange=e=>format('fontName',e.target.value);
+
+// --- Seitenverwaltung ---
+let pages=[{html:'<p>Willkommen bei OctoNote!</p>',canvas:''}];
+let currentPage=0;
+function updatePageUI(){document.getElementById('currentPage').textContent=currentPage+1;document.getElementById('totalPages').textContent=pages.length;}
+function loadPage(){editor.innerHTML=pages[currentPage].html;drawCanvas();}
+function savePage(){pages[currentPage].html=editor.innerHTML;}
+function nextPage(){savePage();if(currentPage<pages.length-1){currentPage++;loadPage();}updatePageUI();}
+function prevPage(){savePage();if(currentPage>0){currentPage--;loadPage();}updatePageUI();}
+function newPage(){savePage();pages.push({html:'',canvas:''});currentPage=pages.length-1;loadPage();updatePageUI();}
+function newNotebook(){pages=[{html:'<p>Neue Notiz</p>',canvas:''}];currentPage=0;loadPage();updatePageUI();}
+loadPage(); updatePageUI();
+  // --- Canvas Zeichnen ---
+const editor = document.getElementById('editor');
+const canvas = document.querySelector('.pageCanvas'); 
+const ctx = canvas.getContext('2d'); 
+let drawing = false; 
+
+function resizeCanvas() {
+  canvas.width = editor.clientWidth;
+  canvas.height = editor.clientHeight;
+} 
+window.addEventListener('resize', resizeCanvas); 
+resizeCanvas();
+
+canvas.addEventListener('mousedown', () => drawing = true);
+canvas.addEventListener('mouseup', () => { drawing = false; ctx.beginPath(); });
+canvas.addEventListener('mousemove', draw);
+
+function startDrawing() {
+  canvas.style.pointerEvents = 'auto';
+}
+
+function draw(e) {
+  if(!drawing) return; 
+  ctx.lineWidth = parseInt(document.getElementById('drawSize').value); 
+  ctx.strokeStyle = document.getElementById('drawColor').value; 
+  ctx.lineCap = 'round'; 
+  ctx.lineTo(e.offsetX, e.offsetY); 
+  ctx.stroke(); 
+  ctx.beginPath(); 
+  ctx.moveTo(e.offsetX, e.offsetY);
+}
+
+function drawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height); 
+  if(pages[currentPage].canvas){
+    let img = new Image(); 
+    img.src = pages[currentPage].canvas; 
+    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  }
+}
+
+// --- Raster / Karo ---
+let grid = true; 
+
+function toggleGrid() {
+  grid = !grid; 
+  drawGrid();
+} 
+
+function updateGrid() { drawGrid(); }
+
+function drawGrid() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height); 
+  if(!grid) return; 
+  const size = parseInt(document.getElementById('gridSize').value); 
+  ctx.strokeStyle = '#eee'; 
+  for(let x=0;x<canvas.width;x+=size){
+    ctx.beginPath(); 
+    ctx.moveTo(x,0); 
+    ctx.lineTo(x,canvas.height); 
+    ctx.stroke();
+  }
+  for(let y=0;y<canvas.height;y+=size){
+    ctx.beginPath(); 
+    ctx.moveTo(0,y); 
+    ctx.lineTo(canvas.width,y); 
+    ctx.stroke();
+  }
+}
+
+// --- Bilder / Tabellen ---
+function insertImage() {
+  const url = prompt("Bild-URL:"); 
+  if(url) document.execCommand('insertImage', false, url);
+}
+
+function insertTable() {
+  const rows = parseInt(prompt("Zeilen:")); 
+  const cols = parseInt(prompt("Spalten:")); 
+  if(!rows||!cols) return; 
+  let t = "<table border='1' style='border-collapse:collapse;width:100%'>"; 
+  for(let r=0;r<rows;r++){
+    t += "<tr>"; 
+    for(let c=0;c<cols;c++){
+      t += "<td>&nbsp;</td>"; 
+    }
+    t += "</tr>"; 
+  }
+  t += "</table>"; 
+  document.execCommand('insertHTML', false, t);
+}
+
+// --- .ONNB Speichern / Laden ---
+const fileInput = document.getElementById('fileInput');
+
+function saveONNB() {
+  savePage();
+  const blob = new Blob([JSON.stringify({pages,settings:{}})], {type:'application/json'}); 
+  const a = document.createElement('a'); 
+  a.href = URL.createObjectURL(blob); 
+  a.download = 'notizbuch.onnb'; 
+  a.click();
+}
+
+function openONNB() {
+  fileInput.click(); 
+  fileInput.onchange = e => {
+    const file = e.target.files[0];
+    if(!file) return; 
+    const reader = new FileReader(); 
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result); 
+        pages = data.pages || pages; 
+        currentPage = 0; 
+        loadPage(); 
+        updatePageUI();
+      } catch(err) {
+        alert("Ungültige Datei");
+      }
+    }; 
+    reader.readAsText(file);
+  };
+}
+
+// --- PDF / DOCX Export ---
+function exportDocx() {
+  savePage();
+  const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'></head><body>"; 
+  const footer = "</body></html>"; 
+  const blob = new Blob(['\ufeff', header + pages[currentPage].html + footer], {type:'application/msword'}); 
+  const a = document.createElement('a'); 
+  a.href = URL.createObjectURL(blob); 
+  a.download = 'notizbuch.docx'; 
+  a.click();
+}
+
+function exportPDF() {
+  savePage();
+  const printWindow = window.open('', '', 'width=800,height=600'); 
+  printWindow.document.write('<html><head><title>PDF Export</title></head><body>' + pages[currentPage].html + '</body></html>'); 
+  printWindow.document.close(); 
+  printWindow.print();
+}
+</script>
+</body>
+</html>
