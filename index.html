@@ -3,273 +3,405 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OctoNote 🐙</title>
+<title>OctoNotes+ v2</title>
 <style>
-body { margin:0; font-family:sans-serif; background:#f7f7f7; }
-#ribbon { display:flex; padding:5px; background:#eee; border-bottom:1px solid #ccc; }
-#ribbon button { margin:0 4px; padding:6px 10px; cursor:pointer; }
-#pages { position:relative; width:100%; height:calc(100vh - 50px); overflow:hidden; display:flex; justify-content:center; align-items:center; }
-.page { position:relative; width:800px; height:1000px; background:white; box-shadow:0 0 10px rgba(0,0,0,0.1); }
-canvas { position:absolute; top:0; left:0; }
-.layer { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
-img, .text { position:absolute; cursor:move; }
-#tools { position:fixed; top:60px; right:10px; background:#fff; border:1px solid #ccc; padding:10px; border-radius:5px; }
-#tools input[type=color], #tools input[type=number] { margin:4px; }
+body { margin:0; font-family:'Segoe UI',sans-serif; background:#f5f7fb; color:#222; display:flex; flex-direction:column; height:100vh;}
+button, select, input, textarea { font-family: inherit; cursor:pointer; }
+#ribbon { display:flex; flex-direction:column; background:linear-gradient(180deg,#fafbfd 0%,#eef3fb 100%); border-bottom:1px solid #cfd6e3; box-shadow:0 2px 6px rgba(20,30,50,0.05); position:sticky; top:0; z-index:100; }
+#ribbon-tabs { display:flex; gap:4px; padding:4px 8px; border-bottom:1px solid #d5d9e3; background:#f9f9fc; }
+#ribbon-tabs .tab { background:none; border:none; padding:6px 12px; border-radius:6px 6px 0 0; transition:all 0.15s ease; font-weight:500; }
+#ribbon-tabs .tab:hover { background:#e9edf6; }
+#ribbon-tabs .tab.active { background:#fff; border:1px solid #d5d9e3; border-bottom:none; color:#222; font-weight:600; }
+#ribbon-groups { display:flex; gap:10px; padding:8px 12px; background:#fff; border-top:1px solid #e3e7ef; }
+.ribbon-group { display:flex; align-items:center; gap:8px; }
+.hidden { display:none; }
+#notebook { flex:1; overflow:auto; padding:20px; display:flex; flex-direction:column; align-items:center; }
+.page { position:relative; background:#fff; box-shadow:0 0 6px rgba(0,0,0,0.1); width:800px; height:1100px; margin:20px auto; border-radius:6px; overflow:hidden; }
+canvas.drawing { position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; }
+.page.bg-lined::before, .page.bg-grid::before, .page.bg-dots::before, .page.bg-music::before { content:""; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; background-size:var(--pattern-size,30px) var(--pattern-size,30px); opacity:0.3; }
+.page.bg-lined::before { background-image:linear-gradient(#8aaaf5 1px, transparent 1px); }
+.page.bg-grid::before { background-image:linear-gradient(#9bc4f5 1px, transparent 1px), linear-gradient(90deg, #9bc4f5 1px, transparent 1px); }
+.page.bg-dots::before { background-image:radial-gradient(#9bc4f5 1px, transparent 1px); }
+.page.bg-music::before { background-image:repeating-linear-gradient(#000 0, #000 1px, transparent 1px, transparent 20px); }
+.note-text { position:absolute; background:transparent; border:none; resize:none; font-size:16px; outline:none; width:300px; height:100px; }
+img.draggable { position:absolute; max-width:300px; cursor:move; transform-origin:center center; transition:transform 0.1s ease; }
 </style>
 </head>
 <body>
 
-<div id="ribbon">
-  <button onclick="addPage()">➕ Neue Seite</button>
-  <button onclick="prevPage()">⬅️</button>
-  <button onclick="nextPage()">➡️</button>
-  <button onclick="toggleGrid()">📏 Raster</button>
-  <button onclick="undo()">↩️ Undo</button>
-  <button onclick="redo()">↪️ Redo</button>
-  <button onclick="saveONNB()">💾 Speichern (.onnb)</button>
-  <button onclick="openONNB()">📂 Öffnen (.onnb)</button>
-  <button onclick="exportPDF()">🖨️ Export PDF</button>
-</div>
+<header id="ribbon">
+  <div id="ribbon-tabs">
+    <button class="tab active" data-tab="file">📁 Datei</button>
+    <button class="tab" data-tab="home">🏠 Start</button>
+    <button class="tab" data-tab="insert">➕ Einfügen</button>
+    <button class="tab" data-tab="draw">🖊️ Zeichnen</button>
+    <button class="tab" data-tab="view">👁️ Ansicht</button>
+  </div>
+  <div id="ribbon-groups">
+    <div class="ribbon-group" id="tab-file">
+      <button onclick="saveONNB()">💾 Speichern</button>
+      <button onclick="exportPDF()">📤 PDF</button>
+      <button onclick="openONNB()">📂 Öffnen</button>
+      <button onclick="printNote()">🖨️ Drucken</button>
+    </div>
+    <div class="ribbon-group hidden" id="tab-home">
+      <button onclick="addPage()">📄 Neue Seite</button>
+      <button onclick="addText()">📝 Textfeld</button>
+      <button onclick="deletePage()">🗑️ Seite löschen</button>
+    </div>
+    <div class="ribbon-group hidden" id="tab-insert">
+      <button onclick="triggerFile()">🖼️ Bild einfügen</button>
+      <input type="file" id="imgInput" accept="image/*" hidden>
+    </div>
+    <div class="ribbon-group hidden" id="tab-draw">
+      <label>Farbe <input type="color" id="color" value="#000000"></label>
+      <label>Stärke <input type="range" id="size" min="1" max="15" value="3"></label>
+      <button onclick="setTool('pen')">🖊️ Stift</button>
+      <button onclick="setTool('marker')">🖍️ Marker</button>
+      <button onclick="setTool('eraser')">🩹 Radierer</button>
+    </div>
+    <div class="ribbon-group hidden" id="tab-view">
+      <select id="bgSelect" onchange="changeBG(this.value)">
+        <option value="blank">Leer</option>
+        <option value="lined">Liniert</option>
+        <option value="grid">Kariert</option>
+        <option value="dots">Punktiert</option>
+        <option value="music">Notenlinien</option>
+      </select>
+      <input type="range" min="10" max="50" value="30" id="bgSize" onchange="changePatternSize(this.value)">
+    </div>
+  </div>
+</header>
 
-<div id="pages"></div>
+<main id="notebook"></main>
 
-<div id="tools">
-  <label>Farbe: <input type="color" id="drawColor" value="#000000"></label>
-  <label>Größe: <input type="number" id="drawSize" value="3" min="1" max="20"></label>
-  <button onclick="startDrawingMode()">✏️ Zeichnen</button>
-  <button onclick="addText()">📝 Text</button>
-  <button onclick="addEmoji()">😀 Emoji</button>
-  <button onclick="addImage()">🖼️ Bild</button>
-</div>
-
-<input type="file" id="fileInput" hidden>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-let pages=[]; let currentPage=-1; let drawing=false,lastX=0,lastY=0,grid=false;
-let undoStack=[],redoStack=[];
+  // Globals
+let notebook=document.getElementById("notebook");
+let activePage, tool="pen";
+let colorPicker=document.getElementById("color");
+let sizePicker=document.getElementById("size");
 
-// --- Seitenverwaltung ---
+// Init
+function init(){ addPage(); setupTabs(); }
+init();
+
+// Tabs
+function setupTabs(){
+  const tabs=document.querySelectorAll("#ribbon-tabs .tab");
+  tabs.forEach(t=>{
+    t.addEventListener("click", ()=>{
+      tabs.forEach(tb=>tb.classList.remove("active"));
+      t.classList.add("active");
+      document.querySelectorAll(".ribbon-group").forEach(g=>g.classList.add("hidden"));
+      const g=document.getElementById("tab-"+t.dataset.tab);
+      if(g) g.classList.remove("hidden");
+    });
+  });
+}
+
+// Pages
 function addPage(){
-  const pageDiv=document.createElement('div'); pageDiv.className='page';
-  const canvas=document.createElement('canvas'); canvas.width=800; canvas.height=1000; canvas.className='canvas';
-  const ctx=canvas.getContext('2d'); pageDiv.appendChild(canvas);
-  pages.push({canvas:canvas,ctx:ctx,layers:[],history:[],redoHistory:[]});
-  document.getElementById('pages').innerHTML=''; document.getElementById('pages').appendChild(pageDiv);
-  currentPage=pages.length-1; drawGrid();
+  const page=document.createElement("div");
+  page.className="page";
+  const canvas=document.createElement("canvas");
+  canvas.className="drawing"; canvas.width=800; canvas.height=1100;
+  page.appendChild(canvas);
+  notebook.appendChild(page);
+  activePage=page;
+  setupDrawing(canvas);
 }
 
-function prevPage(){ if(currentPage>0){ savePage(); currentPage--; loadPage(); } }
-function nextPage(){ if(currentPage<pages.length-1){ savePage(); currentPage++; loadPage(); } }
-
-function loadPage(){
-  const page=pages[currentPage];
-  const pageDiv=document.createElement('div'); pageDiv.className='page';
-  pageDiv.appendChild(page.canvas);
-  document.getElementById('pages').innerHTML=''; document.getElementById('pages').appendChild(pageDiv);
-  redrawCanvas(); drawGrid();
+function deletePage(){ if(activePage) activePage.remove(); }
+function addText(){ 
+  if(!activePage) return;
+  const t=document.createElement("textarea"); 
+  t.className="note-text"; t.style.left="100px"; t.style.top="100px"; 
+  activePage.appendChild(t); 
+  t.focus(); 
 }
 
-function savePage(){
-  const page=pages[currentPage];
-  page.savedData=page.canvas.toDataURL();
-}
-
-function redrawCanvas(){
-  const page=pages[currentPage];
-  const ctx=page.ctx; ctx.clearRect(0,0,800,1000);
-  if(page.savedData){ const img=new Image(); img.src=page.savedData; img.onload=()=>ctx.drawImage(img,0,0); }
-}
-</script>
-<script>
-// --- Zeichnen ---
-function startDrawingMode(){
-  const page=pages[currentPage]; 
-  const canvas=page.canvas;
-  canvas.style.pointerEvents='auto';
-  
-  canvas.onmousedown=e=>{
-    drawing=true;
-    lastX=e.offsetX; lastY=e.offsetY;
-    // Undo speichern
-    page.history.push(canvas.toDataURL());
-    page.redoHistory=[];
-  };
-  
-  canvas.onmouseup=e=>{ drawing=false; };
-  
-  canvas.onmousemove=e=>{
-    if(!drawing) return;
-    const ctx=page.ctx;
-    ctx.strokeStyle=document.getElementById('drawColor').value;
-    ctx.lineWidth=parseInt(document.getElementById('drawSize').value);
-    ctx.lineCap='round';
-    ctx.beginPath();
-    ctx.moveTo(lastX,lastY);
-    ctx.lineTo(e.offsetX,e.offsetY);
-    ctx.stroke();
-    lastX=e.offsetX; lastY=e.offsetY;
-  };
-}
-
-// --- Undo / Redo ---
-function undo(){
-  const page=pages[currentPage];
-  if(page.history.length===0) return;
-  const last=page.history.pop();
-  page.redoHistory.push(page.canvas.toDataURL());
-  const img=new Image(); img.src=last;
-  img.onload=()=>page.ctx.drawImage(img,0,0);
-}
-
-function redo(){
-  const page=pages[currentPage];
-  if(page.redoHistory.length===0) return;
-  const next=page.redoHistory.pop();
-  page.history.push(page.canvas.toDataURL());
-  const img=new Image(); img.src=next;
-  img.onload=()=>page.ctx.drawImage(img,0,0);
-}
-</script>
-<script>
-// --- Raster / Karo / Notenlinien ---
-function toggleGrid(){
-  grid=!grid; drawGrid();
-}
-
-function drawGrid(){
-  const page=pages[currentPage]; if(!page) return;
-  const ctx=page.ctx;
-  // Hintergrund wiederherstellen
-  redrawCanvas();
-  if(!grid) return;
-  
-  const spacing=40; // Standard Rastergröße
-  ctx.strokeStyle='#eee';
-  ctx.lineWidth=1;
-  
-  // Vertikale Linien
-  for(let x=0;x<800;x+=spacing){
-    ctx.beginPath();
-    ctx.moveTo(x,0); ctx.lineTo(x,1000); ctx.stroke();
-  }
-  // Horizontale Linien
-  for(let y=0;y<1000;y+=spacing){
-    ctx.beginPath();
-    ctx.moveTo(0,y); ctx.lineTo(800,y); ctx.stroke();
-  }
-}
-
-// --- Karo / Notenlinien anpassen ---
-function setGridSpacing(value){
-  const page=pages[currentPage]; if(!page) return;
-  page.gridSpacing=parseInt(value);
-  drawCustomGrid();
-}
-
-function drawCustomGrid(){
-  const page=pages[currentPage]; if(!page) return;
-  redrawCanvas();
-  if(!grid) return;
-  
-  const spacing=page.gridSpacing || 40;
-  const ctx=page.ctx; ctx.strokeStyle='#eee'; ctx.lineWidth=1;
-  
-  for(let x=0;x<800;x+=spacing){
-    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,1000); ctx.stroke();
-  }
-  for(let y=0;y<1000;y+=spacing){
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(800,y); ctx.stroke();
-  }
-}
-
-// --- Notenlinien Beispiel ---
-function drawStaffLines(lines=5, lineSpacing=20, offsetY=100){
-  const page=pages[currentPage]; if(!page) return;
-  const ctx=page.ctx; ctx.strokeStyle='#000'; ctx.lineWidth=1;
-  for(let i=0;i<lines;i++){
-    const y=offsetY+i*lineSpacing;
-    ctx.beginPath(); ctx.moveTo(50,y); ctx.lineTo(750,y); ctx.stroke();
-  }
-}
-</script>
-<script>
-// --- Elemente hinzufügen ---
-function addText(){
-  const txt=document.createElement('div');
-  txt.className='text'; txt.contentEditable=true;
-  txt.style.left='100px'; txt.style.top='100px';
-  txt.style.fontSize='20px'; txt.style.color='#000';
-  txt.textContent='📝 Neuer Text';
-  makeDraggable(txt); pages[currentPage].canvas.parentElement.appendChild(txt);
-}
-
-function addEmoji(){
-  const emoji=document.createElement('div');
-  emoji.className='text'; emoji.contentEditable=true;
-  emoji.style.left='150px'; emoji.style.top='150px'; emoji.style.fontSize='30px';
-  emoji.textContent='😀';
-  makeDraggable(emoji); pages[currentPage].canvas.parentElement.appendChild(emoji);
-}
-
-function addImage(){
-  const url=prompt("Bild-URL eingeben:");
-  if(!url) return;
-  const img=document.createElement('img'); img.src=url;
-  img.style.left='200px'; img.style.top='200px'; img.style.width='150px';
-  makeDraggable(img); pages[currentPage].canvas.parentElement.appendChild(img);
-}
-
-// --- Drag & Drop ---
+// Images
+function triggerFile(){ document.getElementById("imgInput").click(); }
+document.getElementById("imgInput").onchange=e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const img=new Image(); img.src=URL.createObjectURL(file); img.className="draggable"; img.style.left="150px"; img.style.top="150px";
+  activePage.appendChild(img); makeDraggable(img);
+};
 function makeDraggable(el){
-  el.onmousedown=function(e){
-    let offsetX=e.offsetX, offsetY=e.offsetY;
-    function move(ev){
-      el.style.left=ev.pageX-offsetX+'px';
-      el.style.top=ev.pageY-offsetY+'px';
-    }
-    document.addEventListener('mousemove',move);
-    document.onmouseup=function(){ document.removeEventListener('mousemove',move); document.onmouseup=null; };
-  }
+  let pos1=0,pos2=0,pos3=0,pos4=0;
+  el.onmousedown=e=>{ e.preventDefault(); pos3=e.clientX; pos4=e.clientY; document.onmouseup=stopDrag; document.onmousemove=drag; };
+  function drag(e){ e.preventDefault(); pos1=pos3-e.clientX; pos2=pos4-e.clientY; pos3=e.clientX; pos4=e.clientY; el.style.top=(el.offsetTop-pos2)+"px"; el.style.left=(el.offsetLeft-pos1)+"px"; }
+  function stopDrag(){ document.onmouseup=null; document.onmousemove=null; }
 }
 
-// --- ONNB speichern/laden ---
+// Drawing
+function setupDrawing(canvas){
+  let lastX=0, lastY=0, drawing=false;
+  const ctx = canvas.getContext("2d");
+
+  canvas.addEventListener("pointerdown", e=>{
+    drawing=true; [lastX,lastY]=[e.offsetX,e.offsetY]; ctx.beginPath(); ctx.moveTo(lastX,lastY);
+  });
+  canvas.addEventListener("pointermove", e=>{
+    if(!drawing) return;
+    ctx.strokeStyle = colorPicker.value;
+    ctx.lineWidth = sizePicker.value;
+    ctx.lineCap = "round";
+    ctx.globalAlpha = tool==="marker"?0.4:1;
+    if(tool==="eraser") ctx.globalCompositeOperation="destination-out"; else ctx.globalCompositeOperation="source-over";
+    ctx.lineTo(e.offsetX,e.offsetY); ctx.stroke(); [lastX,lastY]=[e.offsetX,e.offsetY];
+  });
+  canvas.addEventListener("pointerup", ()=>{ drawing=false; ctx.globalAlpha=1; ctx.globalCompositeOperation="source-over"; });
+}
+
+function setTool(t){ tool=t; }
+
+// Backgrounds
+function changeBG(type){
+  if(!activePage) return;
+  activePage.classList.remove("bg-lined","bg-grid","bg-dots","bg-music");
+  if(type==="lined") activePage.classList.add("bg-lined");
+  else if(type==="grid") activePage.classList.add("bg-grid");
+  else if(type==="dots") activePage.classList.add("bg-dots");
+  else if(type==="music") activePage.classList.add("bg-music");
+}
+function changePatternSize(v){ 
+  if(activePage) activePage.style.setProperty("--pattern-size", v+"px");
+  }
+  // --- ONNB Speichern & Laden (wie gehabt) ---
 function saveONNB(){
   const data={pages:[]};
-  pages.forEach(p=>{
-    data.pages.push({canvas:p.canvas.toDataURL(),layers:[]});
+  document.querySelectorAll(".page").forEach(page=>{
+    const canvas=page.querySelector("canvas.drawing");
+    const imgData=canvas.toDataURL();
+    const texts=[];
+    page.querySelectorAll("textarea.note-text").forEach(t=>{
+      texts.push({
+        value:t.value,
+        left:t.style.left,
+        top:t.style.top,
+        width:t.style.width,
+        height:t.style.height,
+        fontSize:t.style.fontSize
+      });
+    });
+    const images=[];
+    page.querySelectorAll("img.draggable").forEach(im=>{
+      images.push({src:im.src,left:im.style.left,top:im.style.top,width:im.width,height:im.height});
+    });
+    data.pages.push({imgData,texts,images,bg:page.className});
   });
-  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='OctoNote.onnb'; a.click();
+  const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="OctoNote.onnb"; a.click();
 }
 
 function openONNB(){
-  const input=document.getElementById('fileInput'); input.accept='.onnb'; input.click();
+  const input=document.createElement("input"); input.type="file"; input.accept=".onnb";
   input.onchange=e=>{
     const file=e.target.files[0]; if(!file) return;
     const reader=new FileReader();
     reader.onload=ev=>{
       const data=JSON.parse(ev.target.result);
-      pages=[]; document.getElementById('pages').innerHTML='';
-      data.pages.forEach(d=>{
-        addPage(); pages[pages.length-1].canvas.getContext('2d').drawImage(new Image(){src=d.canvas},0,0);
+      notebook.innerHTML="";
+      data.pages.forEach(p=>{
+        const page=document.createElement("div"); page.className=p.bg;
+        const canvas=document.createElement("canvas"); canvas.className="drawing"; canvas.width=800; canvas.height=1100;
+        page.appendChild(canvas);
+        const ctx=canvas.getContext("2d");
+        const img=new Image(); img.src=p.imgData; img.onload=()=>ctx.drawImage(img,0,0);
+        p.texts.forEach(t=>{
+          const ta=document.createElement("textarea"); ta.className="note-text";
+          ta.value=t.value; ta.style.left=t.left; ta.style.top=t.top;
+          ta.style.width=t.width; ta.style.height=t.height; ta.style.fontSize=t.fontSize;
+          page.appendChild(ta);
+        });
+        p.images.forEach(im=>{
+          const image=new Image(); image.src=im.src; image.className="draggable";
+          image.style.left=im.left; image.style.top=im.top;
+          page.appendChild(image); makeDraggable(image);
+        });
+        notebook.appendChild(page); setupDrawing(canvas);
       });
-    }; reader.readAsText(file);
-  }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
 }
 
-// --- PDF Export (einfach) ---
-function exportPDF(){
-  const { jsPDF } = window.jspdf;
-  const pdf=new jsPDF('p','px','a4');
-  pages.forEach((p,i)=>{
-    pdf.addImage(p.canvas.toDataURL(),'PNG',0,0,595,842);
-    if(i<pages.length-1) pdf.addPage();
+// --- Zeichnen Extended (Stift & Marker Effekte)
+function setupDrawing(canvas){
+  let lastX=0, lastY=0, drawing=false;
+  const ctx=canvas.getContext("2d");
+
+  canvas.addEventListener("pointerdown", e=>{
+    drawing=true; [lastX,lastY]=[e.offsetX,e.offsetY]; ctx.beginPath(); ctx.moveTo(lastX,lastY);
   });
-  pdf.save('OctoNote.pdf');
+  canvas.addEventListener("pointermove", e=>{
+    if(!drawing) return;
+    ctx.lineCap="round";
+    ctx.globalAlpha = tool==="marker"?0.3:1;
+    ctx.lineWidth = sizePicker.value;
+    if(tool==="eraser"){ ctx.globalCompositeOperation="destination-out"; ctx.strokeStyle="rgba(0,0,0,1)"; }
+    else{ ctx.globalCompositeOperation="source-over"; ctx.strokeStyle=colorPicker.value; }
+    // Marker Effekte
+    if(tool==="marker"){ ctx.shadowColor=colorPicker.value; ctx.shadowBlur=5; }
+    else ctx.shadowBlur=0;
+    ctx.lineTo(e.offsetX,e.offsetY); ctx.stroke(); [lastX,lastY]=[e.offsetX,e.offsetY];
+  });
+  canvas.addEventListener("pointerup", ()=>{ drawing=false; ctx.globalAlpha=1; ctx.globalCompositeOperation="source-over"; ctx.shadowBlur=0; });
 }
-</script>
 
-<!-- jsPDF CDN für PDF Export -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+// --- PDF Export Extended (inkl. Emojis & Bilder)
+async function exportPDF(){
+  const { jsPDF } = window.jspdf;
+  const pdf=new jsPDF({unit:"px", format:[800,1100]});
+  const pages=document.querySelectorAll(".page");
+  for(let i=0;i<pages.length;i++){
+    const canvasEl=document.createElement("canvas"); canvasEl.width=800; canvasEl.height=1100;
+    const tctx=canvasEl.getContext("2d");
+    const page=pages[i];
+    // Zeichnungen
+    const canvas=page.querySelector("canvas.drawing");
+    tctx.drawImage(canvas,0,0);
+    // Textfelder (inkl. Emojis)
+    page.querySelectorAll("textarea.note-text").forEach(t=>{
+      tctx.font=`${parseInt(t.style.fontSize||16)}px sans-serif`;
+      tctx.fillStyle="#000";
+      const lines=t.value.split("\n");
+      lines.forEach((line,j)=>tctx.fillText(line,parseInt(t.style.left),parseInt(t.style.top)+16*(j+1)));
+    });
+    // Bilder
+    page.querySelectorAll("img.draggable").forEach(im=>tctx.drawImage(im,parseInt(im.style.left),parseInt(im.style.top),im.width,im.height));
+    const imgData=canvasEl.toDataURL("image/png");
+    if(i>0) pdf.addPage();
+    pdf.addImage(imgData,"PNG",0,0,800,1100);
+  }
+  pdf.save("OctoNote.pdf");
+}
+
+// Drucken
+function printNote(){
+  const w=window.open();
+  w.document.write(notebook.innerHTML);
+  w.document.close();
+  w.focus();
+  w.print();
+  w.close();
+}
+
+// --- Hintergrund & Notenlinien/Karos/Punkte ---
+function changeBG(type){
+  if(!activePage) return;
+  activePage.classList.remove("bg-lined","bg-grid","bg-dots","bg-music");
+  if(type==="lined") activePage.classList.add("bg-lined");
+  else if(type==="grid") activePage.classList.add("bg-grid");
+  else if(type==="dots") activePage.classList.add("bg-dots");
+  else if(type==="music") activePage.classList.add("bg-music");
+}
+function changePatternSize(v){ if(activePage) activePage.style.setProperty("--pattern-size", v+"px"); }
+  // --- Seitenverwaltung ---
+let currentPageIndex = 0;
+
+function addPage(){
+  const page = document.createElement("div");
+  page.className = "page bg-lined"; // Standard Hintergrund
+  page.dataset.index = notebook.children.length;
+  const canvas = document.createElement("canvas");
+  canvas.className = "drawing"; canvas.width = 800; canvas.height = 1100;
+  page.appendChild(canvas);
+  notebook.appendChild(page);
+  setupDrawing(canvas);
+  setActivePage(page);
+}
+
+function setActivePage(page){
+  if(activePage) activePage.style.border = "none";
+  activePage = page;
+  activePage.style.border = "2px solid #0078D7"; // Aktive Seite markieren
+  currentPageIndex = parseInt(page.dataset.index);
+}
+
+// Seiten wechseln
+function nextPage(){ if(currentPageIndex<notebook.children.length-1) setActivePage(notebook.children[currentPageIndex+1]); }
+function prevPage(){ if(currentPageIndex>0) setActivePage(notebook.children[currentPageIndex-1]); }
+
+// --- Zoom & Scroll ---
+let zoomLevel = 1;
+function setZoom(level){
+  zoomLevel = level;
+  notebook.style.transform = `scale(${zoomLevel})`;
+  notebook.style.transformOrigin = "top left";
+}
+document.getElementById("zoomIn").onclick = ()=>setZoom(zoomLevel+0.1);
+document.getElementById("zoomOut").onclick = ()=>setZoom(Math.max(0.2,zoomLevel-0.1));
+
+// --- Auto-Save & Online-Sync ---
+function autoSave(){
+  const data = { pages: [] };
+  document.querySelectorAll(".page").forEach(page=>{
+    const canvas = page.querySelector("canvas.drawing");
+    const imgData = canvas.toDataURL();
+    const texts = [];
+    page.querySelectorAll("textarea.note-text").forEach(t=>{
+      texts.push({
+        value: t.value,
+        left: t.style.left,
+        top: t.style.top,
+        width: t.style.width,
+        height: t.style.height,
+        fontSize: t.style.fontSize
+      });
+    });
+    const images = [];
+    page.querySelectorAll("img.draggable").forEach(im=>{
+      images.push({src: im.src,left: im.style.left,top: im.style.top,width:im.width,height:im.height});
+    });
+    data.pages.push({imgData,texts,images,bg:page.className});
+  });
+  localStorage.setItem(`octonote-${notebook.dataset.id||"default"}`, JSON.stringify(data));
+}
+
+// Auto-Save alle 5 Sekunden
+setInterval(autoSave,5000);
+
+// --- Laden aus URL ---
+function loadFromURL(){
+  const path = window.location.pathname.split("/");
+  const id = path[path.length-1];
+  notebook.dataset.id = id || "default";
+  const saved = localStorage.getItem(`octonote-${id}`);
+  if(saved){
+    const data = JSON.parse(saved);
+    notebook.innerHTML="";
+    data.pages.forEach(p=>{
+      const page = document.createElement("div");
+      page.className=p.bg;
+      const canvas = document.createElement("canvas"); canvas.className="drawing"; canvas.width=800; canvas.height=1100;
+      page.appendChild(canvas);
+      const ctx = canvas.getContext("2d");
+      const img = new Image(); img.src=p.imgData; img.onload=()=>ctx.drawImage(img,0,0);
+      p.texts.forEach(t=>{
+        const ta = document.createElement("textarea"); ta.className="note-text";
+        ta.value=t.value; ta.style.left=t.left; ta.style.top=t.top; ta.style.width=t.width; ta.style.height=t.height; ta.style.fontSize=t.fontSize;
+        page.appendChild(ta);
+      });
+      p.images.forEach(im=>{
+        const image = new Image(); image.src=im.src; image.className="draggable"; image.style.left=im.left; image.style.top=im.top;
+        page.appendChild(image); makeDraggable(image);
+      });
+      notebook.appendChild(page); setupDrawing(canvas);
+    });
+    setActivePage(notebook.children[0]);
+  } else addPage();
+}
+
+// Initialisieren
+window.addEventListener("load", loadFromUpage
+      // Initialisieren: Notizbuch laden
+window.addEventListener("load", loadFromURL);
+
+</script>
 </body>
 </html>
