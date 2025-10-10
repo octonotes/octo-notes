@@ -12,7 +12,7 @@ button, select, input, textarea { font-family: inherit; cursor:pointer; }
 #ribbon-tabs .tab { background:none; border:none; padding:6px 12px; border-radius:6px 6px 0 0; transition:all 0.15s ease; font-weight:500; }
 #ribbon-tabs .tab:hover { background:#e9edf6; }
 #ribbon-tabs .tab.active { background:#fff; border:1px solid #d5d9e3; border-bottom:none; color:#222; font-weight:600; }
-#ribbon-groups { display:flex; gap:10px; padding:8px 12px; background:#fff; border-top:1px solid #e3e7ef; }
+#ribbon-groups { display:flex; gap:10px; padding:8px 12px; background:#fff; border-top:1px solid #e3e7ef; flex-wrap:wrap; }
 .ribbon-group { display:flex; align-items:center; gap:8px; }
 .hidden { display:none; }
 #notebook { flex:1; overflow:auto; padding:20px; display:flex; flex-direction:column; align-items:center; }
@@ -38,52 +38,82 @@ img.draggable { position:absolute; max-width:300px; cursor:move; transform-origi
     <button class="tab" data-tab="view">👁️ Ansicht</button>
   </div>
   <div id="ribbon-groups">
+    <!-- Datei Tab -->
     <div class="ribbon-group" id="tab-file">
       <button onclick="saveONNB()">💾 Speichern</button>
       <button onclick="exportPDF()">📤 PDF</button>
       <button onclick="openONNB()">📂 Öffnen</button>
       <button onclick="printNote()">🖨️ Drucken</button>
     </div>
+
+    <!-- Start Tab mit Textformatierung -->
     <div class="ribbon-group hidden" id="tab-home">
       <button onclick="addPage()">📄 Neue Seite</button>
       <button onclick="addText()">📝 Textfeld</button>
+
+      <!-- Textformatierung -->
+      <label>Schriftart:
+        <select id="fontSelect" onchange="setFont(this.value)">
+          <option value="Arial">Arial</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Tahoma">Tahoma</option>
+          <option value="Segoe UI">Segoe UI</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Impact">Impact</option>
+          <option value="Comic Sans MS">Comic Sans MS</option>
+        </select>
+      </label>
+
+      <label>Größe:
+        <input type="number" id="fontSize" value="16" min="8" max="72" onchange="setFontSize(this.value)"> px
+      </label>
+
+      <button onclick="toggleBold()">B</button>
+      <button onclick="toggleItalic()">I</button>
+      <button onclick="toggleUnderline()">U</button>
+
       <button onclick="deletePage()">🗑️ Seite löschen</button>
-      <label>Schriftart: 
-  <select id="fontSelect" onchange="setFont(this.value)">
-    <option value="Arial">Arial</option>
-    <option value="Verdana">Verdana</option>
-    <option value="Tahoma">Tahoma</option>
-    <option value="Segoe UI">Segoe UI</option>
-    <option value="Times New Roman">Times New Roman</option>
-    <option value="Courier New">Courier New</option>
-    <option value="Georgia">Georgia</option>
-    <option value="Impact">Impact</option>
-    <option value="Comic Sans MS">Comic Sans MS</option>
-  </select>
-      input type="range" min="10" max="50" value="30" id="bgSize" onchange="changePatternSize(this.value)">
+    </div>
+
+    <!-- Insert Tab -->
+    <div class="ribbon-group hidden" id="tab-insert">
+      <button onclick="triggerFile()">🖼️ Bild einfügen</button>
+      <input type="file" id="imgInput" accept="image/*" hidden>
+    </div>
+
+    <!-- Draw Tab -->
+    <div class="ribbon-group hidden" id="tab-draw">
+      <label>Farbe <input type="color" id="color" value="#000000"></label>
+      <label>Stärke <input type="range" id="size" min="1" max="15" value="3"></label>
+      <button onclick="setTool('pen')">🖊️ Stift</button>
+      <button onclick="setTool('marker')">🖍️ Marker</button>
+      <button onclick="setTool('eraser')">🩹 Radierer</button>
+    </div>
+
+    <!-- View Tab -->
+    <div class="ribbon-group hidden" id="tab-view">
+      <select id="bgSelect" onchange="changeBG(this.value)">
+        <option value="blank">Leer</option>
+        <option value="lined">Liniert</option>
+        <option value="grid">Kariert</option>
+        <option value="dots">Punktiert</option>
+        <option value="music">Notenlinien</option>
+      </select>
+      <input type="range" min="10" max="50" value="30" id="bgSize" onchange="changePatternSize(this.value)">
     </div>
   </div>
 </header>
 
 <main id="notebook"></main>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-  // --- Globals ---
 let notebook = document.getElementById("notebook");
 let activePage = null;
 let tool = "pen";
 let colorPicker = document.getElementById("color");
 let sizePicker = document.getElementById("size");
-let zoomLevel = 1;
-
-// --- Init ---
-function init() {
-  addPage();
-  setupRibbonTabs();
-  loadFromURL();
-}
-window.addEventListener("DOMContentLoaded", init);
 
 // --- Ribbon Tabs ---
 function setupRibbonTabs() {
@@ -94,14 +124,12 @@ function setupRibbonTabs() {
     tab.addEventListener("click", () => {
       tabs.forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
-
       groups.forEach(g => g.classList.add("hidden"));
       const target = document.getElementById("tab-" + tab.dataset.tab);
       if (target) target.classList.remove("hidden");
     });
   });
 
-  // Setze ersten Tab aktiv
   tabs[0].classList.add("active");
   groups.forEach(g => g.classList.add("hidden"));
   const firstGroup = document.getElementById("tab-" + tabs[0].dataset.tab);
@@ -114,7 +142,8 @@ function addPage() {
   page.className = "page bg-lined";
   const canvas = document.createElement("canvas");
   canvas.className = "drawing";
-  canvas.width = 800; canvas.height = 1100;
+  canvas.width = 800;
+  canvas.height = 1100;
   page.appendChild(canvas);
   notebook.appendChild(page);
 
@@ -127,83 +156,43 @@ function deletePage() {
   if (!activePage) return;
   const idx = parseInt(activePage.dataset.index);
   activePage.remove();
-
-  // Update indices
-  [...notebook.children].forEach((p, i) => p.dataset.index = i);
-  if (notebook.children[idx]) setActivePage(notebook.children[idx]);
-  else if (notebook.children[idx - 1]) setActivePage(notebook.children[idx - 1]);
+  [...notebook.children].forEach((p,i)=>p.dataset.index=i);
+  if(notebook.children[idx]) setActivePage(notebook.children[idx]);
+  else if(notebook.children[idx-1]) setActivePage(notebook.children[idx-1]);
   else addPage();
 }
 
 function setActivePage(page) {
-  if (activePage) activePage.style.border = "none";
+  if(activePage) activePage.style.border="none";
   activePage = page;
-  activePage.style.border = "2px solid #0078D7";
+  activePage.style.border="2px solid #0078D7";
 }
 
-// Seitenwechsel
-function nextPage() { if (activePage.dataset.index < notebook.children.length - 1) setActivePage(notebook.children[parseInt(activePage.dataset.index)+1]); }
-function prevPage() { if (activePage.dataset.index > 0) setActivePage(notebook.children[parseInt(activePage.dataset.index)-1]); }
-
 // --- Drawing ---
-function setupDrawing(canvas) {
+function setupDrawing(canvas){
   const ctx = canvas.getContext("2d");
-  let drawing = false;
-  let lastX = 0, lastY = 0;
+  let drawing=false, lastX=0, lastY=0;
 
-  function getCursorPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    // Berechnung unter Berücksichtigung von CSS-Scale (zoomLevel)
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+  function getCursorPos(e){
+    const rect=canvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY
-    };
+    return { x: (clientX - rect.left)*(canvas.width/rect.width), y:(clientY - rect.top)*(canvas.height/rect.height) };
   }
 
-  function startDraw(e) {
-    drawing = true;
-    const pos = getCursorPos(e);
-    lastX = pos.x;
-    lastY = pos.y;
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
+  function startDraw(e){ drawing=true; const pos=getCursorPos(e); lastX=pos.x; lastY=pos.y; ctx.beginPath(); ctx.moveTo(lastX,lastY);}
+  function draw(e){
+    if(!drawing) return;
+    const pos=getCursorPos(e);
+    ctx.lineCap="round";
+    ctx.lineWidth=sizePicker.value;
+    ctx.globalAlpha=tool==="marker"?0.3:1;
+    if(tool==="eraser"){ ctx.globalCompositeOperation="destination-out"; ctx.strokeStyle="rgba(0,0,0,1)"; ctx.shadowBlur=0; }
+    else { ctx.globalCompositeOperation="source-over"; ctx.strokeStyle=colorPicker.value; ctx.shadowBlur=tool==="marker"?5:0; ctx.shadowColor=colorPicker.value; }
+    ctx.lineTo(pos.x,pos.y); ctx.stroke();
+    lastX=pos.x; lastY=pos.y;
   }
-
-  function draw(e) {
-    if (!drawing) return;
-    const pos = getCursorPos(e);
-
-    ctx.lineCap = "round";
-    ctx.lineWidth = sizePicker.value;
-    ctx.globalAlpha = tool === "marker" ? 0.3 : 1;
-
-    if (tool === "eraser") {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.strokeStyle = "rgba(0,0,0,1)";
-      ctx.shadowBlur = 0;
-    } else {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = colorPicker.value;
-      ctx.shadowBlur = tool === "marker" ? 5 : 0;
-      ctx.shadowColor = colorPicker.value;
-    }
-
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    lastX = pos.x;
-    lastY = pos.y;
-  }
-
-  function stopDraw() {
-    drawing = false;
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = "source-over";
-    ctx.shadowBlur = 0;
-  }
+  function stopDraw(){ drawing=false; ctx.globalAlpha=1; ctx.globalCompositeOperation="source-over"; ctx.shadowBlur=0; }
 
   canvas.addEventListener("pointerdown", startDraw);
   canvas.addEventListener("pointermove", draw);
@@ -212,105 +201,118 @@ function setupDrawing(canvas) {
   canvas.addEventListener("touchstart", startDraw);
   canvas.addEventListener("touchmove", draw);
   canvas.addEventListener("touchend", stopDraw);
-  }
+}
+
 // --- Tools ---
-function setTool(t) { tool = t; }
+function setTool(t){ tool=t; }
 
 // --- Textfelder ---
-function addText() {
-  if (!activePage) return;
+function addText(){
+  if(!activePage) return;
   const t = document.createElement("textarea");
-  t.className = "note-text";
-  t.style.left = "100px"; t.style.top = "100px";
+  t.className="note-text";
+  t.style.left="100px"; t.style.top="100px";
+  t.style.fontFamily=document.getElementById("fontSelect").value;
+  t.style.fontSize=document.getElementById("fontSize").value+"px";
   activePage.appendChild(t);
   t.focus();
 }
 
+// --- Textformatierungen ---
+function toggleBold(){ if(!activePage) return; const t=document.activeElement; if(t.tagName==="TEXTAREA"){ t.style.fontWeight = t.style.fontWeight==="bold"?"normal":"bold"; }}
+function toggleItalic(){ if(!activePage) return; const t=document.activeElement; if(t.tagName==="TEXTAREA"){ t.style.fontStyle = t.style.fontStyle==="italic"?"normal":"italic"; }}
+function toggleUnderline(){ if(!activePage) return; const t=document.activeElement; if(t.tagName==="TEXTAREA"){ t.style.textDecoration = t.style.textDecoration==="underline"?"none":"underline"; }}
+function setFont(f){ if(!activePage) return; const t=document.activeElement; if(t.tagName==="TEXTAREA") t.style.fontFamily=f; }
+function setFontSize(s){ if(!activePage) return; const t=document.activeElement; if(t.tagName==="TEXTAREA") t.style.fontSize=s+"px"; }
+
 // --- Bilder ---
-function triggerFile() { document.getElementById("imgInput").click(); }
-document.getElementById("imgInput").onchange = e => {
-  const file = e.target.files[0]; if (!file) return;
-  const img = new Image();
-  img.src = URL.createObjectURL(file);
-  img.className = "draggable";
-  img.style.left = "150px"; img.style.top = "150px";
+function triggerFile(){ document.getElementById("imgInput").click(); }
+document.getElementById("imgInput").onchange = e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const img=new Image();
+  img.src=URL.createObjectURL(file);
+  img.className="draggable";
+  img.style.left="150px"; img.style.top="150px";
   activePage.appendChild(img);
   makeDraggable(img);
 };
 
-function makeDraggable(el) {
-  let pos = {x:0,y:0,startX:0,startY:0};
-  function startDrag(e) {
+function makeDraggable(el){
+  let pos={x:0,y:0,startX:0,startY:0};
+  function startDrag(e){
     e.preventDefault();
     const evt = e.touches ? e.touches[0] : e;
-    pos.startX = evt.clientX; pos.startY = evt.clientY;
-    document.addEventListener(e.touches ? "touchmove" : "mousemove", drag);
-    document.addEventListener(e.touches ? "touchend" : "mouseup", stopDrag);
+    pos.startX=evt.clientX; pos.startY=evt.clientY;
+    document.addEventListener(e.touches?"touchmove":"mousemove",drag);
+    document.addEventListener(e.touches?"touchend":"mouseup",stopDrag);
   }
-  function drag(e) {
+  function drag(e){
     e.preventDefault();
     const evt = e.touches ? e.touches[0] : e;
-    const dx = evt.clientX - pos.startX;
-    const dy = evt.clientY - pos.startY;
-    pos.startX = evt.clientX; pos.startY = evt.clientY;
-    el.style.top = (el.offsetTop + dy) + "px";
-    el.style.left = (el.offsetLeft + dx) + "px";
+    const dx=evt.clientX-pos.startX;
+    const dy=evt.clientY-pos.startY;
+    pos.startX=evt.clientX; pos.startY=evt.clientY;
+    el.style.top=(el.offsetTop+dy)+"px";
+    el.style.left=(el.offsetLeft+dx)+"px";
   }
-  function stopDrag() {
-    document.removeEventListener("mousemove", drag);
-    document.removeEventListener("mouseup", stopDrag);
-    document.removeEventListener("touchmove", drag);
-    document.removeEventListener("touchend", stopDrag);
+  function stopDrag(){
+    document.removeEventListener("mousemove",drag);
+    document.removeEventListener("mouseup",stopDrag);
+    document.removeEventListener("touchmove",drag);
+    document.removeEventListener("touchend",stopDrag);
   }
-  el.addEventListener("mousedown", startDrag);
-  el.addEventListener("touchstart", startDrag);
+  el.addEventListener("mousedown",startDrag);
+  el.addEventListener("touchstart",startDrag);
 }
 
 // --- Hintergrund ---
-function changeBG(type) {
-  if (!activePage) return;
+function changeBG(type){
+  if(!activePage) return;
   activePage.classList.remove("bg-lined","bg-grid","bg-dots","bg-music");
   if(type==="lined") activePage.classList.add("bg-lined");
   else if(type==="grid") activePage.classList.add("bg-grid");
   else if(type==="dots") activePage.classList.add("bg-dots");
   else if(type==="music") activePage.classList.add("bg-music");
 }
-function changePatternSize(v) { if(activePage) activePage.style.setProperty("--pattern-size", v+"px"); }
-
-// --- ONNB Save & Load ---
-function saveONNB() {
-  const data = { pages: [] };
-  document.querySelectorAll(".page").forEach(page => {
-    const canvas = page.querySelector("canvas.drawing");
-    const imgData = canvas.toDataURL();
-    const texts = [];
-    page.querySelectorAll("textarea.note-text").forEach(t => {
-      texts.push({
-        value: t.value, left: t.style.left, top: t.style.top,
-        width: t.style.width, height: t.style.height, fontSize: t.style.fontSize
+function changePatternSize(v){ if(activePage) activePage.style.setProperty("--pattern-size",v+"px"); }
+</script><!-- --- Teil 3 --- -->
+<script>
+  // --- Auto-Save ---
+  function autoSave() {
+    const data = { pages: [] };
+    document.querySelectorAll(".page").forEach(page=>{
+      const canvas = page.querySelector("canvas.drawing");
+      const imgData = canvas.toDataURL();
+      const texts = [];
+      page.querySelectorAll("textarea.note-text").forEach(t=>{
+        texts.push({ 
+          value:t.value, left:t.style.left, top:t.style.top, 
+          width:t.style.width, height:t.style.height, fontSize:t.style.fontSize,
+          fontWeight:t.style.fontWeight, fontStyle:t.style.fontStyle, textDecoration:t.style.textDecoration
+        });
       });
+      const images = [];
+      page.querySelectorAll("img.draggable").forEach(im=>images.push({
+        src:im.src, left:im.style.left, top:im.style.top, width:im.width, height:im.height
+      }));
+      data.pages.push({imgData,texts,images,bg:page.className});
     });
-    const images = [];
-    page.querySelectorAll("img.draggable").forEach(im => {
-      images.push({src:im.src,left:im.style.left,top:im.style.top,width:im.width,height:im.height});
-    });
-    data.pages.push({imgData,texts,images,bg:page.className});
-  });
-  const blob = new Blob([JSON.stringify(data)],{type:"application/json"});
-  const a = document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="OctoNote.onnb"; a.click();
-}
+    localStorage.setItem(`octonote-${notebook.dataset.id||"default"}`, JSON.stringify(data));
+  }
+  setInterval(autoSave,5000);
 
-function openONNB() {
-  const input = document.createElement("input"); input.type="file"; input.accept=".onnb";
-  input.onchange = e => {
-    const file = e.target.files[0]; if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const data = JSON.parse(ev.target.result);
-      notebook.innerHTML = "";
-      data.pages.forEach(p => {
-        const page = document.createElement("div"); page.className = p.bg;
-        const canvas = document.createElement("canvas"); canvas.className = "drawing"; canvas.width=800; canvas.height=1100;
+  // --- Load from URL ---
+  function loadFromURL() {
+    const path = window.location.pathname.split("/");
+    const id = path[path.length-1] || "default";
+    notebook.dataset.id = id;
+    const saved = localStorage.getItem(`octonote-${id}`);
+    if(saved){
+      const data = JSON.parse(saved);
+      notebook.innerHTML="";
+      data.pages.forEach(p=>{
+        const page = document.createElement("div"); page.className=p.bg;
+        const canvas = document.createElement("canvas"); canvas.className="drawing"; canvas.width=800; canvas.height=1100;
         page.appendChild(canvas);
         const ctx = canvas.getContext("2d");
         const img = new Image(); img.src=p.imgData; img.onload = ()=>ctx.drawImage(img,0,0);
@@ -318,101 +320,19 @@ function openONNB() {
           const ta=document.createElement("textarea"); ta.className="note-text";
           ta.value=t.value; ta.style.left=t.left; ta.style.top=t.top;
           ta.style.width=t.width; ta.style.height=t.height; ta.style.fontSize=t.fontSize;
+          ta.style.fontWeight = t.fontWeight || "normal";
+          ta.style.fontStyle = t.fontStyle || "normal";
+          ta.style.textDecoration = t.textDecoration || "none";
           page.appendChild(ta);
         });
         p.images.forEach(im=>{
-          const image = new Image(); image.src=im.src; image.className="draggable"; image.style.left=im.left; image.style.top=im.top;
+          const image=new Image(); image.src=im.src; image.className="draggable";
+          image.style.left=im.left; image.style.top=im.top;
           page.appendChild(image); makeDraggable(image);
         });
         notebook.appendChild(page); setupDrawing(canvas);
       });
       if(notebook.children[0]) setActivePage(notebook.children[0]);
-    };
-    reader.readAsText(file);
-  };
-  input.click();
-}
-
-// --- PDF Export & Drucken ---
-async function exportPDF() {
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({unit:"px", format:[800,1100]});
-  const pages = document.querySelectorAll(".page");
-  for(let i=0;i<pages.length;i++){
-    const canvasEl = document.createElement("canvas"); canvasEl.width=800; canvasEl.height=1100;
-    const tctx = canvasEl.getContext("2d");
-    const page = pages[i];
-    const canvas = page.querySelector("canvas.drawing");
-    tctx.drawImage(canvas,0,0);
-    page.querySelectorAll("textarea.note-text").forEach(t=>{
-      tctx.font = `${parseInt(t.style.fontSize||16)}px sans-serif`;
-      tctx.fillStyle = "#000";
-      t.value.split("\n").forEach((line,j)=>tctx.fillText(line,parseInt(t.style.left),parseInt(t.style.top)+16*(j+1)));
-    });
-    page.querySelectorAll("img.draggable").forEach(im=>tctx.drawImage(im,parseInt(im.style.left),parseInt(im.style.top),im.width,im.height));
-    const imgData = canvasEl.toDataURL("image/png");
-    if(i>0) pdf.addPage();
-    pdf.addImage(imgData,"PNG",0,0,800,1100);
+    }
   }
-  pdf.save("OctoNote.pdf");
-}
-
-function printNote() {
-  const w = window.open();
-  w.document.write(notebook.innerHTML);
-  w.document.close();
-  w.focus();
-  w.print();
-  w.close();
-}
-
-// --- Auto-Save ---
-function autoSave() {
-  const data = { pages: [] };
-  document.querySelectorAll(".page").forEach(page=>{
-    const canvas = page.querySelector("canvas.drawing");
-    const imgData = canvas.toDataURL();
-    const texts = [];
-    page.querySelectorAll("textarea.note-text").forEach(t=>{
-      texts.push({ value:t.value, left:t.style.left, top:t.style.top, width:t.style.width, height:t.style.height, fontSize:t.style.fontSize });
-    });
-    const images = [];
-    page.querySelectorAll("img.draggable").forEach(im=>images.push({src:im.src,left:im.style.left,top:im.style.top,width:im.width,height:im.height}));
-    data.pages.push({imgData,texts,images,bg:page.className});
-  });
-  localStorage.setItem(`octonote-${notebook.dataset.id||"default"}`, JSON.stringify(data));
-}
-setInterval(autoSave,5000);
-
-// --- Load from URL ---
-function loadFromURL() {
-  const path = window.location.pathname.split("/");
-  const id = path[path.length-1] || "default";
-  notebook.dataset.id = id;
-  const saved = localStorage.getItem(`octonote-${id}`);
-  if(saved){
-    const data = JSON.parse(saved);
-    notebook.innerHTML="";
-    data.pages.forEach(p=>{
-      const page = document.createElement("div"); page.className=p.bg;
-      const canvas = document.createElement("canvas"); canvas.className="drawing"; canvas.width=800; canvas.height=1100;
-      page.appendChild(canvas);
-      const ctx = canvas.getContext("2d");
-      const img = new Image(); img.src=p.imgData; img.onload=()=>ctx.drawImage(img,0,0);
-      p.texts.forEach(t=>{
-        const ta=document.createElement("textarea"); ta.className="note-text";
-        ta.value=t.value; ta.style.left=t.left; ta.style.top=t.top; ta.style.width=t.width; ta.style.height=t.height; ta.style.fontSize=t.fontSize;
-        page.appendChild(ta);
-      });
-      p.images.forEach(im=>{
-        const image=new Image(); image.src=im.src; image.className="draggable";
-        image.style.left=im.left; image.style.top=im.top; page.appendChild(image); makeDraggable(image);
-      });
-      notebook.appendChild(page); setupDrawing(canvas);
-    });
-    if(notebook.children[0]) setActivePage(notebook.children[0]);
-  }
-  }
-</script>
-</body>
-      </html>
+</script> </body> </html>
