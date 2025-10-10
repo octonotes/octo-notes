@@ -138,22 +138,56 @@ function makeDraggable(el){
 
 // Drawing
 function setupDrawing(canvas){
-  let lastX=0, lastY=0, drawing=false;
   const ctx = canvas.getContext("2d");
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+
+  function getCursorPos(e){
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / zoomLevel,
+      y: (e.clientY - rect.top) / zoomLevel
+    };
+  }
 
   canvas.addEventListener("pointerdown", e=>{
-    drawing=true; [lastX,lastY]=[e.offsetX,e.offsetY]; ctx.beginPath(); ctx.moveTo(lastX,lastY);
+    drawing = true;
+    const pos = getCursorPos(e);
+    lastX = pos.x; lastY = pos.y;
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
   });
+
   canvas.addEventListener("pointermove", e=>{
     if(!drawing) return;
-    ctx.strokeStyle = colorPicker.value;
-    ctx.lineWidth = sizePicker.value;
+    const pos = getCursorPos(e);
     ctx.lineCap = "round";
-    ctx.globalAlpha = tool==="marker"?0.4:1;
-    if(tool==="eraser") ctx.globalCompositeOperation="destination-out"; else ctx.globalCompositeOperation="source-over";
-    ctx.lineTo(e.offsetX,e.offsetY); ctx.stroke(); [lastX,lastY]=[e.offsetX,e.offsetY];
+    ctx.lineWidth = sizePicker.value;
+    ctx.globalAlpha = tool === "marker" ? 0.3 : 1;
+
+    if(tool === "eraser"){
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = colorPicker.value;
+      ctx.shadowBlur = tool === "marker" ? 5 : 0;
+      ctx.shadowColor = colorPicker.value;
+    }
+
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    lastX = pos.x;
+    lastY = pos.y;
   });
-  canvas.addEventListener("pointerup", ()=>{ drawing=false; ctx.globalAlpha=1; ctx.globalCompositeOperation="source-over"; });
+
+  canvas.addEventListener("pointerup", ()=>{
+    drawing = false;
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.shadowBlur = 0;
+  });
 }
 
 function setTool(t){ tool=t; }
