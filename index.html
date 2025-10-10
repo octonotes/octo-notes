@@ -161,16 +161,22 @@ function setupDrawing(canvas) {
 
   function getCursorPos(e) {
     const rect = canvas.getBoundingClientRect();
+    // Berechnung unter Berücksichtigung von CSS-Scale (zoomLevel)
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     return {
-      x: (e.clientX - rect.left) / zoomLevel,
-      y: (e.clientY - rect.top) / zoomLevel
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
     };
   }
 
   function startDraw(e) {
     drawing = true;
     const pos = getCursorPos(e);
-    lastX = pos.x; lastY = pos.y;
+    lastX = pos.x;
+    lastY = pos.y;
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
   }
@@ -196,7 +202,8 @@ function setupDrawing(canvas) {
 
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
-    lastX = pos.x; lastY = pos.y;
+    lastX = pos.x;
+    lastY = pos.y;
   }
 
   function stopDraw() {
@@ -210,8 +217,10 @@ function setupDrawing(canvas) {
   canvas.addEventListener("pointermove", draw);
   canvas.addEventListener("pointerup", stopDraw);
   canvas.addEventListener("pointerleave", stopDraw);
-}
-
+  canvas.addEventListener("touchstart", startDraw);
+  canvas.addEventListener("touchmove", draw);
+  canvas.addEventListener("touchend", stopDraw);
+  }
 // --- Tools ---
 function setTool(t) { tool = t; }
 
