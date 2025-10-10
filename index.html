@@ -88,18 +88,28 @@ function init(){ addPage(); setupTabs(); }
 init();
 
 // Tabs
+// --- Ribbon Tabs Setup ---
 function setupTabs(){
-  const tabs=document.querySelectorAll("#ribbon-tabs .tab");
-  tabs.forEach(t=>{
-    t.addEventListener("click", ()=>{
-      tabs.forEach(tb=>tb.classList.remove("active"));
-      t.classList.add("active");
-      document.querySelectorAll(".ribbon-group").forEach(g=>g.classList.add("hidden"));
-      const g=document.getElementById("tab-"+t.dataset.tab);
-      if(g) g.classList.remove("hidden");
+  const tabs = document.querySelectorAll("#ribbon-tabs .tab");
+
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      // 1️⃣ Aktiven Tab markieren
+      tabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+
+      // 2️⃣ Alle Ribbon-Gruppen ausblenden
+      document.querySelectorAll(".ribbon-group").forEach(group => group.classList.add("hidden"));
+
+      // 3️⃣ Die passende Gruppe einblenden
+      const group = document.getElementById("tab-" + tab.dataset.tab);
+      if (group) group.classList.remove("hidden");
     });
   });
 }
+
+// Ribbon erst initialisieren, wenn DOM fertig geladen ist
+window.addEventListener("DOMContentLoaded", setupTabs);
 
 // Pages
 function addPage(){
